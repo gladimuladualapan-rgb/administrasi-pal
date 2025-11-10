@@ -20,18 +20,22 @@ function useLocalStorage(key, initial){
 function downloadBlob(blob, filename){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
+  a.href = url; 
+  a.download = filename; 
+  a.click();
   URL.revokeObjectURL(url);
 }
 
+// ✅ FIX — Tidak ada karakter \" yang bermasalah
 function toCSV(rows){
   if(!rows || !rows.length) return "";
   const headers = Object.keys(rows[0]);
-  const esc = v => (v==null?\"\":String(v)).replace(/\"/g,'\"\"');
-  const lines = [headers.join(',')].concat(
-    rows.map(r => headers.map(h => `\"${esc(r[h])}\"`).join(','))
-  );
-  return lines.join('\\n');
+  const esc = (v) => (v == null ? "" : String(v)).replace(/"/g, '""');
+  const lines = [
+    headers.join(","),
+    ...rows.map(r => headers.map(h => `"${esc(r[h])}"`).join(","))
+  ];
+  return lines.join("\n");
 }
 
 export default function App(){
@@ -42,7 +46,6 @@ export default function App(){
   const [masuk, setMasuk]   = useLocalStorage('surat_masuk', []);
   const [nomorCounter, setNomorCounter] = useLocalStorage('nomor_counter', 1);
 
-  // --- Surat Keluar form state ---
   const [sk, setSk] = useState({
     nomor: pad3(nomorCounter),
     kodeTujuan: "",
@@ -60,7 +63,7 @@ export default function App(){
   function validateKeluar(f){
     const errs = [];
     if(!/^\d{3}$/.test(f.nomor)) errs.push("Nomor harus 3 digit (contoh 001).");
-    if(!(f.kodeTujuan==='6' || f.kodeTujuan==='9')) errs.push("Kode Tujuan hanya boleh 6 atau 9.");
+    if(!(f.kodeTujuan==='6' || f.kodeTujuan==='9')) errs.push("Kode Tujuan hanya 6 atau 9.");
     if(!f.kodeJenis) errs.push("Kode Jenis Surat wajib diisi.");
     if(f.kodeJenis==='Lainnya' && !f.kodeJenisLain.trim()) errs.push("Isi kode jenis surat lainnya.");
     if(!BULAN_ROMAWI.includes(f.bulan)) errs.push("Bulan harus I s.d. XII.");
@@ -73,7 +76,7 @@ export default function App(){
   function submitKeluar(e){
     e.preventDefault();
     const errs = validateKeluar(sk);
-    if(errs.length){ alert(\"Periksa input:\\n- \" + errs.join('\\n- ')); return; }
+    if(errs.length){ alert("Periksa input:\n- " + errs.join("\n- ")); return; }
     const data = {
       nomor: sk.nomor,
       kodeTujuan: sk.kodeTujuan,
@@ -87,34 +90,34 @@ export default function App(){
     };
     setKeluar(prev => [...prev, data]);
     setNomorCounter(c => c+1);
-    setSk(s=>({ ...s, nomor: pad3(nomorCounter+1), tujuan: \"\" }));
+    setSk(s=>({ ...s, nomor: pad3(nomorCounter+1), tujuan: "" }));
   }
 
-  // --- Surat Masuk form state ---
   const [sm, setSm] = useState({
-    nomorSurat: \"\",
-    perihal: \"\",
-    asal: \"\",
+    nomorSurat: "",
+    perihal: "",
+    asal: "",
     foto: null,
-    fotoName: \"\"
+    fotoName: ""
   });
+
   const fotoRef = useRef();
 
   function submitMasuk(e){
     e.preventDefault();
     const errs = [];
-    if(!sm.nomorSurat.trim()) errs.push(\"Nomor Surat wajib diisi.\");
-    if(!sm.perihal.trim()) errs.push(\"Perihal Surat wajib diisi.\");
-    if(!sm.asal.trim()) errs.push(\"Asal Instansi wajib diisi.\");
-    const file = sm.foto;
-    if(!file){ errs.push(\"Foto JPG wajib diunggah.\"); }
-    else {
-      if(file.type !== 'image/jpeg'){ errs.push(\"Hanya format JPG diperbolehkan.\"); }
-      if(file.size > 5*1024*1024){ errs.push(\"Ukuran maksimum 5 MB.\"); }
-    }
-    if(errs.length){ alert(\"Periksa input:\\n- \" + errs.join('\\n- ')); return; }
+    if(!sm.nomorSurat.trim()) errs.push("Nomor Surat wajib diisi.");
+    if(!sm.perihal.trim()) errs.push("Perihal Surat wajib diisi.");
+    if(!sm.asal.trim()) errs.push("Asal Instansi wajib diisi.");
 
-    // Simpan sebagai Data URL (untuk pratinjau & ekspor JSON)
+    const file = sm.foto;
+    if(!file){ errs.push("Foto JPG wajib diunggah."); }
+    else {
+      if(file.type !== 'image/jpeg'){ errs.push("Hanya format JPG diperbolehkan."); }
+      if(file.size > 5*1024*1024){ errs.push("Ukuran maksimum 5 MB."); }
+    }
+    if(errs.length){ alert("Periksa input:\n- " + errs.join("\n- ")); return; }
+
     const reader = new FileReader();
     reader.onload = () => {
       const data = {
@@ -126,13 +129,12 @@ export default function App(){
         diterima: new Date().toISOString()
       };
       setMasuk(prev => [...prev, data]);
-      setSm({ nomorSurat:\"\", perihal:\"\", asal:\"\", foto:null, fotoName:\"\" });
+      setSm({ nomorSurat:"", perihal:"", asal:"", foto:null, fotoName:"" });
       if(fotoRef.current) fotoRef.current.value = null;
     };
     reader.readAsDataURL(file);
   }
 
-  // --- Export helpers ---
   function exportKeluarCSV(){
     const csv = toCSV(keluar);
     downloadBlob(new Blob([csv], {type:'text/csv'}), `surat-keluar-${Date.now()}.csv`);
@@ -141,7 +143,13 @@ export default function App(){
     downloadBlob(new Blob([JSON.stringify(keluar,null,2)],{type:'application/json'}), `surat-keluar-${Date.now()}.json`);
   }
   function exportMasukCSV(){
-    const strip = masuk.map(m => ({ nomorSurat:m.nomorSurat, perihal:m.perihal, asal:m.asal, fotoName:m.fotoName, diterima:m.diterima }));
+    const strip = masuk.map(m => ({ 
+      nomorSurat:m.nomorSurat, 
+      perihal:m.perihal, 
+      asal:m.asal, 
+      fotoName:m.fotoName, 
+      diterima:m.diterima 
+    }));
     const csv = toCSV(strip);
     downloadBlob(new Blob([csv], {type:'text/csv'}), `surat-masuk-${Date.now()}.csv`);
   }
@@ -156,148 +164,160 @@ export default function App(){
   }
 
   return (
-    <div className=\"container\">
+    <div className="container">
       <h1 style={{marginBottom:8}}>Administrasi Persuratan</h1>
-      <p className=\"helper\">Data disimpan di <b>localStorage</b> browser Anda. Siap deploy ke Vercel.</p>
+      <p className="helper">Data disimpan di localStorage. Siap deploy ke Vercel.</p>
 
-      <div className=\"tabs\">
+      <div className="tabs">
         <button className={`tab ${tab==='keluar'?'active':''}`} onClick={()=>setTab('keluar')}>Surat Keluar</button>
         <button className={`tab ${tab==='masuk'?'active':''}`} onClick={()=>setTab('masuk')}>Surat Masuk</button>
         <div style={{flex:1}}></div>
-        <div className=\"actions\">
-          <button className=\"ghost\" onClick={clearAll}>Hapus Semua</button>
-        </div>
+        <button className="ghost" onClick={clearAll}>Hapus Semua</button>
       </div>
 
       {tab==='keluar' && (
-        <div className=\"card\">
+        <div className="card">
           <h2>Form Surat Keluar</h2>
-          <form onSubmit={submitKeluar} className=\"row\" style={{marginTop:12}}>
-            <div className=\"field h3\">
+          <form onSubmit={submitKeluar} className="row" style={{marginTop:12}}>
+            <div className="field h3">
               <label>Nomor (3 digit mulai 001)</label>
-              <input value={sk.nomor} onChange={e=>setSk({...sk, nomor:e.target.value})} placeholder=\"001\" />
+              <input value={sk.nomor} onChange={e=>setSk({...sk, nomor:e.target.value})} />
             </div>
-            <div className=\"field h3\">
-              <label>Kode Tujuan Surat (6 / 9)</label>
+
+            <div className="field h3">
+              <label>Kode Tujuan Surat</label>
               <select value={sk.kodeTujuan} onChange={e=>setSk({...sk, kodeTujuan:e.target.value})}>
-                <option value=\"\">-- pilih --</option>
-                <option value=\"6\">6</option>
-                <option value=\"9\">9</option>
+                <option value="">-- pilih --</option>
+                <option value="6">6</option>
+                <option value="9">9</option>
               </select>
             </div>
-            <div className=\"field h3\">
+
+            <div className="field h3">
               <label>Kode Jenis Surat</label>
               <select value={sk.kodeJenis} onChange={e=>setSk({...sk, kodeJenis:e.target.value})}>
-                <option value=\"\">-- pilih --</option>
+                <option value="">-- pilih --</option>
                 {KODE_JENIS.map(k=> <option key={k} value={k}>{k}</option>)}
               </select>
             </div>
+
             {sk.kodeJenis==='Lainnya' && (
-              <div className=\"field h6\">
+              <div className="field h6">
                 <label>Isi Kode Jenis (lainnya)</label>
-                <input value={sk.kodeJenisLain} onChange={e=>setSk({...sk, kodeJenisLain:e.target.value})} placeholder=\"contoh: UND/EDR\" />
+                <input value={sk.kodeJenisLain} onChange={e=>setSk({...sk, kodeJenisLain:e.target.value})} />
               </div>
             )}
-            <div className=\"field h3\">
+
+            <div className="field h3">
               <label>P.A.L</label>
               <input value={sk.pal} onChange={e=>setSk({...sk, pal:e.target.value})} />
             </div>
-            <div className=\"field h3\">
+
+            <div className="field h3">
               <label>Romawi Bulan</label>
               <select value={sk.bulan} onChange={e=>setSk({...sk, bulan:e.target.value})}>
                 {BULAN_ROMAWI.map(b=> <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
-            <div className=\"field h3\">
+
+            <div className="field h3">
               <label>Tahun</label>
-              <input type=\"number\" value={sk.tahun} onChange={e=>setSk({...sk, tahun:e.target.value})} />
+              <input type="number" value={sk.tahun} onChange={e=>setSk({...sk, tahun:e.target.value})} />
             </div>
-            <div className=\"field h6\">
+
+            <div className="field h6">
               <label>Tujuan Surat</label>
               <input value={sk.tujuan} onChange={e=>setSk({...sk, tujuan:e.target.value})} />
             </div>
-            <div className=\"field h6\">
+
+            <div className="field h6">
               <label>Keterangan Surat</label>
               <select value={sk.keterangan} onChange={e=>setSk({...sk, keterangan:e.target.value})}>
                 {KET_SURAT.map(k=> <option key={k} value={k}>{k}</option>)}
               </select>
             </div>
-            <div className=\"field\">
-              <button type=\"submit\">Simpan</button>
+
+            <div className="field">
+              <button type="submit">Simpan</button>
             </div>
           </form>
 
-          <hr className=\"sep\" />
-          <div className=\"actions\">
-            <span className=\"badge\">Total: {keluar.length}</span>
-            <button className=\"ghost\" onClick={exportKeluarCSV}>Export CSV</button>
-            <button className=\"ghost\" onClick={exportKeluarJSON}>Export JSON</button>
-          </div>
-          <table className=\"table\">
+          <h3>Data Surat Keluar</h3>
+
+          <button className="ghost" onClick={exportKeluarCSV}>Export CSV</button>
+          <button className="ghost" onClick={exportKeluarJSON}>Export JSON</button>
+
+          <table className="table">
             <thead>
               <tr>
                 <th>Nomor</th><th>Kode Tujuan</th><th>Kode Jenis</th><th>P.A.L</th><th>Bulan</th><th>Tahun</th><th>Tujuan</th><th>Keterangan</th><th>Dibuat</th>
               </tr>
             </thead>
             <tbody>
-            {keluar.map((r,i)=>(
-              <tr key={i}>
-                <td>{r.nomor}</td><td>{r.kodeTujuan}</td><td>{r.kodeJenis}</td><td>{r.pal}</td><td>{r.bulan}</td><td>{r.tahun}</td><td>{r.tujuan}</td><td>{r.keterangan}</td><td>{new Date(r.dibuat).toLocaleString()}</td>
-              </tr>
-            ))}
+              {keluar.map((r,i)=>(
+                <tr key={i}>
+                  <td>{r.nomor}</td><td>{r.kodeTujuan}</td><td>{r.kodeJenis}</td><td>{r.pal}</td><td>{r.bulan}</td><td>{r.tahun}</td><td>{r.tujuan}</td><td>{r.keterangan}</td>
+                  <td>{new Date(r.dibuat).toLocaleString()}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
 
       {tab==='masuk' && (
-        <div className=\"card\">
+        <div className="card">
           <h2>Form Surat Masuk</h2>
-          <form onSubmit={submitMasuk} className=\"row\" style={{marginTop:12}}>
-            <div className=\"field h4\">
+          <form onSubmit={submitMasuk} className="row" style={{marginTop:12}}>
+            <div className="field h4">
               <label>Nomor Surat</label>
               <input value={sm.nomorSurat} onChange={e=>setSm({...sm, nomorSurat:e.target.value})} />
             </div>
-            <div className=\"field h4\">
+            <div className="field h4">
               <label>Perihal Surat</label>
               <input value={sm.perihal} onChange={e=>setSm({...sm, perihal:e.target.value})} />
             </div>
-            <div className=\"field h4\">
-              <label>Asal Instansi Surat</label>
+            <div className="field h4">
+              <label>Asal Instansi</label>
               <input value={sm.asal} onChange={e=>setSm({...sm, asal:e.target.value})} />
             </div>
-            <div className=\"field h6\">
-              <label>Foto (JPG maks 5 MB)</label>
-              <input ref={fotoRef} type=\"file\" accept=\"image/jpeg\" onChange={e=>{
-                const f = e.target.files?.[0];
-                setSm({...sm, foto:f || null, fotoName:f?f.name:\"\"});
-              }} />
-              <p className=\"helper\">Format JPG. Maksimal 5 MB.</p>
+            <div className="field h6">
+              <label>Foto (JPG maks 5MB)</label>
+              <input 
+                ref={fotoRef} 
+                type="file" 
+                accept="image/jpeg"
+                onChange={e=>{
+                  const f = e.target.files?.[0];
+                  setSm({...sm, foto:f || null, fotoName:f?f.name:""});
+                }}
+              />
             </div>
-            <div className=\"field\">
-              <button type=\"submit\">Simpan</button>
+            <div className="field">
+              <button type="submit">Simpan</button>
             </div>
           </form>
-          <hr className=\"sep\" />
-          <div className=\"actions\">
-            <span className=\"badge\">Total: {masuk.length}</span>
-            <button className=\"ghost\" onClick={exportMasukCSV}>Export CSV</button>
-            <button className=\"ghost\" onClick={exportMasukJSON}>Export JSON</button>
-          </div>
-          <table className=\"table\">
+
+          <h3>Data Surat Masuk</h3>
+          <button className="ghost" onClick={exportMasukCSV}>Export CSV</button>
+          <button className="ghost" onClick={exportMasukJSON}>Export JSON</button>
+
+          <table className="table">
             <thead>
               <tr>
                 <th>Nomor Surat</th><th>Perihal</th><th>Asal</th><th>Foto</th><th>Diterima</th>
               </tr>
             </thead>
             <tbody>
-            {masuk.map((m,i)=>(
-              <tr key={i}>
-                <td>{m.nomorSurat}</td><td>{m.perihal}</td><td>{m.asal}</td>
-                <td>{m.fotoName ? <a href={m.fotoDataUrl} target=\"_blank\" rel=\"noreferrer\">{m.fotoName}</a> : '-'}</td>
-                <td>{new Date(m.diterima).toLocaleString()}</td>
-              </tr>
-            ))}
+              {masuk.map((m,i)=>(
+                <tr key={i}>
+                  <td>{m.nomorSurat}</td>
+                  <td>{m.perihal}</td>
+                  <td>{m.asal}</td>
+                  <td>{m.fotoName ? <a href={m.fotoDataUrl} target="_blank">{m.fotoName}</a> : "-"}</td>
+                  <td>{new Date(m.diterima).toLocaleString()}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
